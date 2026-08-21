@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Awaaz — Voice RAG Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        obsidian: "#040508",
+                        mint: "#10B981",
+                        acid: "#CCFF00"
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'SF Mono', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23040508'/><path d='M35 42a15 15 0 0 1 30 0M37 42v8a13 13 0 0 0 26 0v-8' stroke='%2306B6D4' stroke-width='6' fill='none' stroke-linecap='round'/><path d='M50 63v10M43 73h14' stroke='%2310B981' stroke-width='6' stroke-linecap='round'/></svg>">
+</head>
+<body class="bg-obsidian text-slate-200 font-sans antialiased min-h-screen overflow-x-hidden">
+
+    <!-- Ambient radial soundwave grid + central glow -->
+    <div class="ambient" aria-hidden="true"></div>
+
+    <!-- ── Header ─────────────────────────────────────────── -->
+    <header id="siteTop" class="sticky top-0 z-50 bg-obsidian/70 backdrop-blur-xl border-b border-slate-800/80">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <span class="brand-mark">
+                    <svg class="brand-mic" viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" stroke="currentColor" stroke-width="1.8"/>
+                        <path d="M19 11a7 7 0 0 1-14 0M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                    <span class="brand-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+                </span>
+                <span class="font-mono font-extrabold tracking-[0.15em] text-lg text-slate-100">Awaaz</span>
+            </div>
+            <nav class="hidden md:flex items-center gap-8 font-mono text-xs tracking-[0.16em] text-slate-300">
+                <a href="#agent" class="nav-link">AGENT</a>
+                <a href="#questions" class="nav-link">SAMPLE QUERIES</a>
+                <a href="#how" class="nav-link">HOW IT WORKS</a>
+                <a href="#dev" class="nav-link">ENGINE CORE</a>
+            </nav>
+            <div class="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border border-slate-800/80 bg-slate-950/60">
+                <span id="apiDot" class="api-led" title="Backend status"></span>
+                <span id="apiStatus" class="font-mono text-[10px] tracking-[0.2em] text-slate-400">PROTOCOL ONLINE</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="relative z-10">
+        <!-- ── Hero (entry / pitch) ─────────────────────────── -->
+        <section class="min-h-[calc(100vh-4rem)] flex items-center py-16 sm:py-20 page" id="hero">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 text-center w-full">
+                <span class="hero-badge reveal">
+                    <span class="pulse-light"><span class="pulse-inner"></span></span>
+                    <span>SUB-200MS VOICE GROUNDING ENGINE</span>
+                </span>
+
+                <h1 id="heroTitle" class="focus-container" aria-label="Voice RAG Model">
+                    <span class="focus-word">Voice</span>
+                    <span class="focus-word text-gradient">RAG</span>
+                    <span class="focus-word">Model</span>
+                    <span id="focusFrame" class="focus-frame">
+                        <span class="corner top-left"></span>
+                        <span class="corner top-right"></span>
+                        <span class="corner bottom-left"></span>
+                        <span class="corner bottom-right"></span>
+                    </span>
+                </h1>
+
+                <p class="attribution reveal">~ by Abhirup</p>
+
+                <p class="text-slate-400 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto mb-8 reveal">
+                    Transcribe with Sarvam's realtime speech model, retrieve from 116,319 indexed chunks
+                    with hybrid dense + BM25 search, and get evidence-grounded answers in real time.
+                </p>
+
+                <div class="flex flex-wrap justify-center gap-4 reveal">
+                    <a href="#agent" class="cta-btn cta-primary">
+                        <span class="cta-icon">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" stroke="currentColor" stroke-width="1.8"/>
+                                <path d="M19 11a7 7 0 0 1-14 0M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                            </svg>
+                        </span>
+                        TEST THE RAG MODEL
+                    </a>
+                    <a href="#how" class="cta-btn cta-ghost">
+                        <span class="cta-icon">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
+                                <path d="M9.5 9.5a2.5 2.5 0 1 1 3.4 2.3c-.8.3-.9.9-.9 1.7M12 16.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                            </svg>
+                        </span>
+                        HOW IT WORKS
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Voice RAG Agent (live console) ───────────────── -->
+        <section class="max-w-4xl mx-auto px-4 sm:px-6 py-16 page" id="agent">
+            <span class="section-tag reveal">[ LIVE AGENT ]</span>
+            <h2 class="agent-title reveal">Voice RAG Agent</h2>
+
+            <!-- Live stage strip -->
+            <div class="stages justify-center mb-8 reveal" id="stagesPanel" aria-label="Pipeline stages">
+                <div class="stage" data-stage="listening"><span class="stage-ico">01</span><span class="stage-name">LISTENING</span><span class="stage-ms"></span></div>
+                <div class="stage-arrow"></div>
+                <div class="stage" data-stage="transcribing"><span class="stage-ico">02</span><span class="stage-name">TRANSCRIBING</span><span class="stage-ms"></span></div>
+                <div class="stage-arrow"></div>
+                <div class="stage" data-stage="retrieving"><span class="stage-ico">03</span><span class="stage-name">RETRIEVING</span><span class="stage-ms"></span></div>
+                <div class="stage-arrow"></div>
+                <div class="stage" data-stage="grounding"><span class="stage-ico">04</span><span class="stage-name">GROUNDING</span><span class="stage-ms"></span></div>
+                <div class="stage-arrow"></div>
+                <div class="stage" data-stage="answering"><span class="stage-ico">05</span><span class="stage-name">ANSWER</span><span class="stage-ms"></span></div>
+            </div>
+
+            <!-- Mic + query bar (same size, side by side) -->
+            <div class="agent-ctrl reveal">
+                <button id="recordBtn" class="mic-bar" aria-pressed="false">
+                    <svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" stroke="currentColor" stroke-width="1.7"/>
+                        <path d="M19 11a7 7 0 0 1-14 0M12 18v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                    </svg>
+                    <span class="mic-label">HOLD TO TALK</span>
+                </button>
+
+                <form id="textForm" class="flex-1 min-w-[260px] relative">
+                    <div class="input-frame">
+                        <input id="textInput" type="text" placeholder="TYPE A QUERY IN ANY LANGUAGE... PRESS ENTER"
+                               class="w-full px-5 py-3.5 pr-24 rounded-xl bg-slate-950/80 border border-slate-800/80 focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 outline-none font-mono text-sm text-slate-100 placeholder:text-slate-600 transition-colors" autocomplete="off"/>
+                        <button type="submit" class="ask-btn">ASK</button>
+                    </div>
+                </form>
+            </div>
+
+            <p id="status" class="font-mono text-xs text-slate-500 h-4 mt-4 text-center" role="status" aria-live="polite"></p>
+
+            <!-- Results -->
+            <div class="results" id="results">
+                <section class="rounded-2xl border border-slate-800/80 bg-slate-950/60 backdrop-blur-xl p-5 sm:p-6" id="transcriptPanel" hidden>
+                    <h3 class="panel-h">QUERY // CAPTURED</h3>
+                    <p id="transcriptText" class="font-mono text-sm text-cyan-300 break-words"></p>
+                </section>
+
+                <section class="rounded-2xl border border-slate-800/80 bg-slate-950/60 backdrop-blur-xl p-5 sm:p-6 answer-panel" id="answerPanel" hidden>
+                    <h3 class="panel-h">ANSWER // SYNTHESIZED</h3>
+                    <div id="answerText" class="answer-text"></div>
+                    <div id="citePills" class="cite-pills"></div>
+                    <div id="badge" class="badge"></div>
+                </section>
+
+                <section class="rounded-2xl border border-slate-800/80 bg-slate-950/60 backdrop-blur-xl p-5 sm:p-6" id="sourcesPanel" hidden>
+                    <h3 class="panel-h">EVIDENCE // RETRIEVED &amp; SCORED</h3>
+                    <ol id="sourcesList" class="sources-list"></ol>
+                </section>
+
+                <section class="rounded-2xl border border-slate-800/80 bg-slate-950/60 backdrop-blur-xl p-5 sm:p-6" id="latencyPanel" hidden>
+                    <h3 class="panel-h">LATENCY // SEGMENTED WATERFALL</h3>
+                    <div id="latencyBar" class="latency-bar"></div>
+                    <div id="latencyTarget" class="latency-target"></div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                        <div class="rounded-xl border border-slate-800/80 bg-slate-950/70 p-4">
+                            <div class="font-mono text-[10px] tracking-[0.2em] text-slate-500 mb-2">BREAKDOWN</div>
+                            <ul id="latencyList" class="latency-list"></ul>
+                        </div>
+                        <div class="rounded-xl border border-slate-800/80 bg-slate-950/70 p-4 flex flex-col justify-between">
+                            <div class="font-mono text-[10px] tracking-[0.2em] text-slate-500 mb-2">TOTAL ROUND TRIP</div>
+                            <div id="totalLatency" class="font-mono font-extrabold text-3xl text-slate-100">-- ms</div>
+                            <div id="totalLatencyMeta" class="font-mono text-[11px] text-slate-500 mt-2"></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <!-- ── Sample questions (grounded vs not-in-corpus) ─── -->
+        <section class="max-w-5xl mx-auto px-4 sm:px-6 py-16 page" id="questions">
+            <span class="section-tag reveal">[ PROBED QUERIES // VERIFIED ]</span>
+            <h2 class="agent-title reveal">Test The RAG Model</h2>
+            <p class="text-slate-400 text-sm sm:text-base leading-relaxed max-w-3xl mx-auto text-center mb-12 reveal">
+                Pre-verified questions across languages — each one already grounded against the corpus.
+                Click any card to run it live on the agent.
+            </p>
+
+            <div class="q-grid">
+                <button type="button" class="q-card reveal" data-query="What is the capital of India?">
+                    <span class="q-lang">EN</span>
+                    <span class="q-text">What is the capital of India?</span>
+                    <span class="q-status grounded"><span class="q-dot"></span>GROUNDED &amp; VERIFIED</span>
+                </button>
+                <button type="button" class="q-card reveal" data-query="Bharat ki rajdhani kya hai?">
+                    <span class="q-lang">HINGLISH</span>
+                    <span class="q-text">Bharat ki rajdhani kya hai?</span>
+                    <span class="q-status grounded"><span class="q-dot"></span>GROUNDED &amp; VERIFIED</span>
+                </button>
+                <button type="button" class="q-card reveal" data-query="Goa ki rajdhani kya hai?">
+                    <span class="q-lang">हिन्दी</span>
+                    <span class="q-text">Goa ki rajdhani kya hai?</span>
+                    <span class="q-status grounded"><span class="q-dot"></span>GROUNDED &amp; VERIFIED</span>
+                </button>
+                <button type="button" class="q-card reveal" data-query="What is the currency of England?">
+                    <span class="q-lang">EN</span>
+                    <span class="q-text">What is the currency of England?</span>
+                    <span class="q-status grounded"><span class="q-dot"></span>GROUNDED &amp; VERIFIED</span>
+                </button>
+                <button type="button" class="q-card reveal" data-query="What is the currency of Japan?">
+                    <span class="q-lang">EN</span>
+                    <span class="q-text">What is the currency of Japan?</span>
+                    <span class="q-status grounded"><span class="q-dot"></span>GROUNDED &amp; VERIFIED</span>
+                </button>
+                <button type="button" class="q-card reveal" data-query="What is the exchange rate of the Mars colonial dollar?">
+                    <span class="q-lang">EN</span>
+                    <span class="q-text">What is the exchange rate of the Mars colonial dollar?</span>
+                    <span class="q-status off"><span class="q-dot"></span>NOT IN CORPUS</span>
+                </button>
+                <button type="button" class="q-card reveal" data-query="how to hack a password">
+                    <span class="q-lang">EN</span>
+                    <span class="q-text">How to hack a password?</span>
+                    <span class="q-status blocked"><span class="q-dot"></span>BLOCKED BY GUARDRAIL</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- ── How it works (flip cards) ─────────────────────── -->
+        <section class="max-w-5xl mx-auto px-4 sm:px-6 py-16 page" id="how">
+            <span class="section-tag reveal">[ ARCHITECTURE PIPELINE ]</span>
+            <h2 class="how-title reveal">HOW DOES IT WORK?</h2>
+            <p class="text-slate-400 text-sm sm:text-base leading-relaxed max-w-3xl mx-auto text-center mb-12 reveal">
+                Voice is transcribed by Sarvam's realtime speech model, knowledge is retrieved with
+                GPU-accelerated dense retrieval, answers are grounded in evidence and verified before they are spoken.
+                Tap any stage card to flip it and read the detail.
+            </p>
+
+            <div class="how-grid">
+                <div class="flip-card reveal" data-step="01">
+                    <div class="flip-inner">
+                        <div class="flip-front">
+                            <span class="how-num">01</span>
+                            <h3>VOICE</h3>
+                            <span class="flip-hint">TAP TO FLIP</span>
+                        </div>
+                        <div class="flip-back">
+                            <p>Sarvam's realtime speech model captures raw multilingual acoustics.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-card reveal" data-step="02">
+                    <div class="flip-inner">
+                        <div class="flip-front">
+                            <span class="how-num">02</span>
+                            <h3>TRANSCRIBE</h3>
+                            <span class="flip-hint">TAP TO FLIP</span>
+                        </div>
+                        <div class="flip-back">
+                            <p>Speech is converted into multilingual text tokens with live confidence.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-card reveal" data-step="03">
+                    <div class="flip-inner">
+                        <div class="flip-front">
+                            <span class="how-num">03</span>
+                            <h3>RETRIEVE</h3>
+                            <span class="flip-hint">TAP TO FLIP</span>
+                        </div>
+                        <div class="flip-back">
+                            <p>Relevant passages are retrieved from the 116,319-chunk corpus with GPU dense + BM25 retrieval.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-card reveal" data-step="04">
+                    <div class="flip-inner">
+                        <div class="flip-front">
+                            <span class="how-num">04</span>
+                            <h3>GROUND</h3>
+                            <span class="flip-hint">TAP TO FLIP</span>
+                        </div>
+                        <div class="flip-back">
+                            <p>Evidence verifier calculates support scores and guarantees strict factual bounds.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-card reveal" data-step="05">
+                    <div class="flip-inner">
+                        <div class="flip-front">
+                            <span class="how-num">05</span>
+                            <h3>ANSWER</h3>
+                            <span class="flip-hint">TAP TO FLIP</span>
+                        </div>
+                        <div class="flip-back">
+                            <p>Answers are generated only when evidence is sufficient, refusing ungrounded claims.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── About Abhirup ─────────────────────────────────── -->
+        <section class="max-w-4xl mx-auto px-4 sm:px-6 py-16 page" id="dev">
+            <span class="section-tag reveal">[ THE HUMAN BEHIND THE SIGNAL ]</span>
+            <div class="rounded-2xl border border-slate-800/80 bg-slate-950/60 backdrop-blur-xl shadow-[0_24px_60px_-24px_rgba(0,0,0,0.9)] overflow-hidden reveal">
+                <div class="about-head px-5 sm:px-7 py-8 text-center">
+                    <span class="monogram reveal"><span>AK</span></span>
+                    <h2 class="about-title">ABOUT ABHIRUP</h2>
+                    <p class="about-sub">VOICE RAG ENGINEER // INDIC LINGUISTICS</p>
+                </div>
+                <div class="px-5 sm:px-7 pb-8">
+                    <p class="text-sm sm:text-base text-slate-400 leading-relaxed mb-7 text-center max-w-2xl mx-auto">
+                        <strong class="text-cyan-400">Abhirup</strong> built this voice-enabled multilingual
+                        retrieval-augmented agent over a <strong class="text-mint">116,319-chunk</strong> Indic-language
+                        corpus — wiring Sarvam's realtime speech, GPU-accelerated hybrid dense + BM25 retrieval,
+                        and evidence-grounding guardrails into one low-latency console.
+                    </p>
+
+                    <div class="spec-chips">
+                        <span class="spec-chip"><b>RETRIEVAL</b> FAISS IVF + BM25 HYBRID</span>
+                        <span class="spec-chip"><b>EMBEDDER</b> INTLFLOAT E5-LARGE · INT8 ONNX</span>
+                        <span class="spec-chip"><b>LLM</b> GROQ GPT-OSS-120B STREAMING</span>
+                        <span class="spec-chip"><b>STT</b> SARVAM REALTIME SPEECH</span>
+                        <span class="spec-chip"><b>GUARDRAILS</b> SAFETY · TOPIC · GROUNDING</span>
+                        <span class="spec-chip"><b>LATENCY</b> RETRIEVAL P70 117MS</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-7">
+                        <div class="metric"><span class="m-key">CORPUS SIZE</span><span class="m-dots"></span><span class="m-val">116,319 CHUNKS</span></div>
+                        <div class="metric"><span class="m-key">LANGUAGES</span><span class="m-dots"></span><span class="m-val">14 INDIC + ENGLISH</span></div>
+                        <div class="metric"><span class="m-key">STT ENGINE</span><span class="m-dots"></span><span class="m-val">SARVAM REALTIME STT</span></div>
+                        <div class="metric"><span class="m-key">RETRIEVAL P70</span><span class="m-dots"></span><span class="m-val">117MS</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ── Footer ─────────────────────────────────────────── -->
+    <footer class="foot">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 font-mono text-[11px] tracking-[0.14em] text-slate-500">
+            <span>AWAAZ // REAL-TIME MULTILINGUAL VOICE RAG</span>
+            <span class="text-center">ENGINEERED BY <a href="https://github.com/" target="_blank" rel="noopener" class="text-slate-300 hover:text-cyan-400 transition-colors">ABHIRUP</a></span>
+            <span class="flex items-center gap-2">
+                SYS_STATUS: <b id="sysState" class="sys-ok">OPERATIONAL</b>
+                <span class="text-slate-700">&middot;</span>
+                PING: <b id="sysPing" class="text-slate-300">--</b>MS
+            </span>
+        </div>
+    </footer>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script src="/static/truefocus.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>
