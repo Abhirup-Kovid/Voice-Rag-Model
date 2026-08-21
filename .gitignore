@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.env
+*.onnx
+models/onnx_e5_small/model.onnx
+models/onnx_e5_small/model_int8.onnx
+data/processed_passages.jsonl
+data/upload_progress.json
+data/upload_v2_progress.json
+*.zip
+data/chunks_metadata.json
+indexes/
+.pytest_cache/
