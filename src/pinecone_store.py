@@ -1,30 +1,60 @@
-"""Pinecone serverless store: hybrid query + client-side sparse vocabulary."""
+"""Pinecone serverless store: hybrid query via raw HTTP (bypasses SDK connection issues)."""
 import json
 import os
 import re
 import structlog
+import requests
 from typing import Dict, List, Optional
 
 from src.config import settings
 
 logger = structlog.get_logger(__name__)
 
-_index = None
 _vocab: Dict[str, int] = {}
 _SPARSE_VOCAB_PATH = os.path.join(settings.DATA_DIR, "sparse_vocab.json")
 _TOKEN_RE = re.compile(r"\w+", re.UNICODE)
 
 PINECONE_INDEX_HOST = "awaaz-rag-8xe0b98.svc.aped-4627-b74a.pinecone.io"
+PINECONE_QUERY_URL = f"https://{PINECONE_INDEX_HOST}/query"
 
 
-def get_index():
-    global _index
-    if _index is None:
-        from pinecone import Pinecone
-        pc = Pinecone(api_key=settings.PINECONE_API_KEY)
-        _index = pc.Index(host=PINECONE_INDEX_HOST)
-        logger.info(f"Connected to Pinecone index: {PINECONE_INDEX_HOST}")
-    return _index
+def hybrid_query(vector: List[float], sparse: Optional[Dict[str, List]], top_k: int = 24):
+    """Query Pinecone using raw HTTP POST to avoid SDK connection issues."""
+    payload = {
+        "namespace": settings.PINECONE_NAMESPACE,
+        "topK": top_k,
+        "vector": vector,
+        "includeMetadata": True,
+    }
+    if sparse:
+        payload["sparseVector"] = sparse
+
+    headers = {
+        "Api-Key": settings.PINECONE_API_KEY,
+        "Content-Type": "application/json",
+    }
+
+    resp = requests.post(PINECONE_QUERY_URL, json=payload, headers=headers, timeout=10)
+    resp.raise_for_status()
+    data = resp.json()
+
+    class Match:
+        def __init__(self, m):
+            self.id = m.get("id", "")
+            self.score = m.get("score", 0.0)
+            meta = m.get("metadata", {})
+            self.text = meta.get("text", "")
+            self.language = meta.get("language", "")
+            self.strategy = meta.get("strategy", "")
+            self.doc_id = meta.get("doc_id", "")
+            self.chunk_id = meta.get("chunk_id", self.id)
+
+    class QueryResult:
+        def __init__(self, matches):
+            self.matches = matches
+
+    matches = [Match(m) for m in data.get("matches", [])]
+    return QueryResult(matches)
 
 
 def load_vocab() -> Dict[str, int]:
@@ -41,7 +71,6 @@ def tokenize(text: str) -> List[str]:
 
 
 def build_sparse(text: str) -> Optional[Dict[str, List]]:
-    """Client-side sparse vector: term counts mapped through the corpus vocab."""
     vocab = load_vocab()
     if not vocab:
         return None
@@ -56,20 +85,7 @@ def build_sparse(text: str) -> Optional[Dict[str, List]]:
     return {"indices": indices, "values": [float(counts[i]) for i in indices]}
 
 
-def hybrid_query(vector: List[float], sparse: Optional[Dict[str, List]], top_k: int = 24):
-    kwargs = dict(
-        namespace=settings.PINECONE_NAMESPACE,
-        top_k=top_k,
-        vector=vector,
-        include_metadata=True,
-    )
-    if sparse:
-        kwargs["sparse_vector"] = sparse
-    return get_index().query(**kwargs)
-
-
 def warmup():
-    """Prime the Pinecone index to absorb serverless cold start."""
     from src.embedder import embed_texts
     try:
         emb = embed_texts(["query: warmup"], is_query=True)
