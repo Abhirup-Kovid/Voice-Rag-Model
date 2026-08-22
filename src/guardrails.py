@@ -123,9 +123,10 @@ def check_refusal(answer: str) -> bool:
     """Check if the model refused to answer or indicated lack of knowledge."""
     refusal_patterns = [
         r"i'?m not aware",
+        r"i'?m sorry",
         r"i don'?t (?:have|know|recall)",
         r"i am not (?:aware|familiar)",
-        r"doesn'?t include",
+        r"doesn'?t (?:include|contain|have|have any)",
         r"not (?:include|contain|available)",
         r"no relevant context",
         r"outside the knowledge base",
@@ -133,6 +134,8 @@ def check_refusal(answer: str) -> bool:
         r"i cannot process",
         r"not (?:found|present) in",
         r"don'?t have information",
+        r"doesn'?t contain any",
+        r"no information about",
     ]
     lower = answer.lower()
     return any(re.search(p, lower) for p in refusal_patterns)
