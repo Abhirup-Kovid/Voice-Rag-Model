@@ -1,4 +1,4 @@
-var LATENCY_TARGET_MS = 2000;
+var LATENCY_TARGET_MS = 200;
 var MIME_CANDIDATES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
 
 /* Prevent auto-scroll to a stale #hash on load */
