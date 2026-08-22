@@ -420,9 +420,9 @@ function renderResult(data) {
     if (data.guardrail) {
         if (data.guardrail.unsafe) status = "unsafe";
         else if (data.guardrail.off_topic) status = "offtopic";
+        else if (data.guardrail.refused) status = "refused";
         else if (data.guardrail.needs_escalation) status = "escalation";
         else if (!data.guardrail.grounded) status = "ungrounded";
-        else if (data.guardrail.refused) status = "refused";
         else if (!data.guardrail.passed) status = "ungrounded";
     }
     var BADGES = {

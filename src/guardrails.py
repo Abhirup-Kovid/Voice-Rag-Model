@@ -120,5 +120,19 @@ def compute_evidence_score(evidence_map: List[Dict]) -> float:
 
 
 def check_refusal(answer: str) -> bool:
-    """Check if the model refused to answer."""
-    return False
+    """Check if the model refused to answer or indicated lack of knowledge."""
+    refusal_patterns = [
+        r"i'?m not aware",
+        r"i don'?t (?:have|know|recall)",
+        r"i am not (?:aware|familiar)",
+        r"doesn'?t include",
+        r"not (?:include|contain|available)",
+        r"no relevant context",
+        r"outside the knowledge base",
+        r"may need to consult",
+        r"i cannot process",
+        r"not (?:found|present) in",
+        r"don'?t have information",
+    ]
+    lower = answer.lower()
+    return any(re.search(p, lower) for p in refusal_patterns)
