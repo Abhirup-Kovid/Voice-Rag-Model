@@ -629,6 +629,24 @@ html { scroll-behavior: smooth; }
 .ev-lang { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; color: #64748B; letter-spacing: 0.1em;
     padding: 0.05rem 0.4rem; border-radius: 4px; border: 1px solid rgba(100, 116, 139, 0.4); }
 .ev-strategy { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; color: #475569; margin-left: auto; }
+
+.evidence-path-list { list-style: none; }
+.evidence-path-item {
+    display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap;
+    padding: 0.6rem 0.8rem; margin-bottom: 0.4rem;
+    background: rgba(9, 13, 22, 0.45);
+    border: 1px solid rgba(100, 116, 139, 0.2);
+    border-left: 2px solid rgba(99, 102, 241, 0.4);
+    border-radius: 10px; transition: all 0.2s;
+}
+.evidence-path-item:hover { border-color: rgba(99, 102, 241, 0.5); background: rgba(99, 102, 241, 0.06); }
+.ev-sentence { font-size: 0.82rem; color: #CBD5E1; flex: 1; min-width: 200px; font-style: italic; }
+.ev-arrow { color: #6366F1; font-weight: 700; font-size: 0.9rem; }
+.ev-source-ref { font-family: 'JetBrains Mono', monospace; font-weight: 800; color: #06B6D4; font-size: 0.8rem; }
+.ev-confidence { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 5px; }
+.ev-high { color: #10B981; background: rgba(16, 185, 129, 0.12); }
+.ev-med { color: #F59E0B; background: rgba(245, 158, 11, 0.12); }
+.ev-low { color: #EF4444; background: rgba(239, 68, 68, 0.12); }
 .ev-gauge {
     height: 5px; border-radius: 999px; overflow: hidden;
     background: rgba(15, 23, 42, 0.9); margin-bottom: 0.6rem;
