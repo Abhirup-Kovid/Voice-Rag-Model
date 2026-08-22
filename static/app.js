@@ -1,4 +1,4 @@
-var LATENCY_TARGET_MS = 200;
+var LATENCY_TARGET_MS = 2000;
 var MIME_CANDIDATES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
 
 /* Prevent auto-scroll to a stale #hash on load */
@@ -334,6 +334,51 @@ function renderCitePills(sources) {
         wrap.appendChild(pill);
     });
 }
+
+function renderEvidencePath(evidencePath, sources) {
+    var panel = document.getElementById("evidencePathPanel");
+    var list = document.getElementById("evidencePathList");
+    if (!panel || !list) return;
+    list.innerHTML = "";
+    if (!evidencePath || evidencePath.length === 0) {
+        panel.hidden = true;
+        return;
+    }
+    panel.hidden = false;
+    evidencePath.forEach(function(e) {
+        var li = document.createElement("li");
+        li.className = "evidence-path-item";
+        var conf = e.confidence || 0;
+        var confClass = conf >= 0.3 ? "ev-high" : (conf >= 0.15 ? "ev-med" : "ev-low");
+        li.innerHTML =
+            '<span class="ev-sentence">"' + e.sentence + '"</span>' +
+            '<span class="ev-arrow">→</span>' +
+            '<span class="ev-source-ref">' + e.source_id + '</span>' +
+            '<span class="ev-confidence ' + confClass + '">' + Math.round(conf * 100) + '% match</span>';
+        li.addEventListener("mouseenter", function() {
+            highlightEvidence(e.source_idx);
+        });
+        li.addEventListener("mouseleave", function() {
+            clearEvidenceHighlight();
+        });
+        list.appendChild(li);
+    });
+}
+
+function logEscalation(data) {
+    if (!data.guardrail || !data.guardrail.needs_escalation) return;
+    fetch("/api/escalate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            query_id: data.query_id,
+            query: lastQuery,
+            answer: data.answer,
+            reason: data.guardrail.reason,
+            evidence_score: data.guardrail.evidence_score,
+        })
+    }).catch(function() {});
+}
 function highlightEvidence(idx) {
     document.querySelectorAll(".evidence-card").forEach(function(c) {
         c.classList.toggle("ev-active", parseInt(c.dataset.idx, 10) === idx);
@@ -371,11 +416,21 @@ function renderResult(data) {
     document.getElementById("answerPanel").hidden = false;
 
     var badge = document.getElementById("badge");
-    var status = data.guardrail ? (data.guardrail.passed ? "ok" : (data.guardrail.unsafe ? "unsafe" : (data.guardrail.off_topic ? "offtopic" : "ungrounded"))) : "error";
+    var status = "ok";
+    if (data.guardrail) {
+        if (data.guardrail.unsafe) status = "unsafe";
+        else if (data.guardrail.off_topic) status = "offtopic";
+        else if (data.guardrail.needs_escalation) status = "escalation";
+        else if (!data.guardrail.grounded) status = "ungrounded";
+        else if (data.guardrail.refused) status = "refused";
+        else if (!data.guardrail.passed) status = "ungrounded";
+    }
     var BADGES = {
         ok: ["GROUNDED & VERIFIED", "badge-ok"],
         offtopic: ["OUT OF CORPUS // NO SUPPORT", "badge-warn"],
         ungrounded: ["NOT CONFIDENTLY GROUNDED", "badge-warn"],
+        escalation: ["FLAGGED FOR REVIEW // LOW EVIDENCE", "badge-warn"],
+        refused: ["REFUSED // OUTSIDE KNOWLEDGE BASE", "badge-warn"],
         unsafe: ["BLOCKED BY SAFETY GUARDRAIL", "badge-err"],
         error: ["PIPELINE ERROR", "badge-err"]
     };
@@ -385,8 +440,10 @@ function renderResult(data) {
 
     renderSources(data.sources || []);
     renderCitePills(data.sources || []);
+    renderEvidencePath(data.evidence_path || [], data.sources || []);
     renderLatency(data);
     renderStages(data);
+    logEscalation(data);
     document.getElementById("latencyPanel").hidden = false;
 
     var resultsBox = document.getElementById("results");
