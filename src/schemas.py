@@ -32,6 +32,12 @@ class LatencyBreakdown(BaseModel):
     llm_total_ms: Optional[int] = None
     total_ms: Optional[int] = None
 
+class EvidenceLink(BaseModel):
+    sentence: str
+    source_idx: int
+    source_id: str
+    confidence: float
+
 class GuardrailResult(BaseModel):
     passed: bool
     off_topic: bool
@@ -39,10 +45,13 @@ class GuardrailResult(BaseModel):
     grounded: bool
     refused: bool
     reason: Optional[str] = None
+    evidence_score: Optional[float] = None
+    needs_escalation: bool = False
 
 class TextResponse(BaseModel):
     answer: str
     sources: List[Source]
+    evidence_path: List[EvidenceLink] = []
     latency: LatencyBreakdown
     guardrail: GuardrailResult
     query_id: str
