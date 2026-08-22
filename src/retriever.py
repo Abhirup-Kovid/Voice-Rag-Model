@@ -36,21 +36,19 @@ def retrieve(query: str, language: Optional[str] = None, k: int = 8) -> List[Sou
     # 3. Rerank: Pinecone score + language bonus
     scored = []
     for m in resp.matches:
-        meta = m.get("metadata", {})
-        lang_bonus = 0.10 if language and meta.get("language") == language else 0.0
+        lang_bonus = 0.10 if language and m.language == language else 0.0
         scored.append((m.score + lang_bonus, m))
 
     scored.sort(key=lambda x: x[0], reverse=True)
     sources = []
     for score, m in scored[:settings.TOP_K_FINAL]:
-        meta = m.get("metadata", {})
         sources.append(Source(
-            chunk_id=m.get("id", ""),
-            text=meta.get("text", ""),
-            language=meta.get("language", ""),
-            strategy=meta.get("strategy", "hybrid"),
+            chunk_id=m.chunk_id,
+            text=m.text,
+            language=m.language,
+            strategy=m.strategy or "hybrid",
             score=score,
-            doc_id=meta.get("doc_id", ""),
+            doc_id=m.doc_id,
             char_offsets=[0, 0]
         ))
 

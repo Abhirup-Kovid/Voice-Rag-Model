@@ -95,7 +95,7 @@ def generate_full(query: str, context_chunks: List[Dict], language: str) -> dict
                 model=settings.GROQ_MODEL,
                 messages=messages,
                 stream=False,
-                timeout=5.0
+                timeout=15.0
             )
             ttft = (time.time() - start_time) * 1000
             answer = response.choices[0].message.content

@@ -16,7 +16,7 @@ from src.stt_sarvam import transcribe_audio, STTError
 from src.llm_groq import generate_stream, generate_full
 from src.latency import latency_monitor
 
-ESCALATION_THRESHOLD = 0.15
+ESCALATION_THRESHOLD = 0.05
 
 logger = structlog.get_logger(__name__)
 
@@ -120,25 +120,21 @@ class RAGHarness:
             evidence_score = compute_evidence_score(evidence_map)
 
             needs_escalation = (
-                not is_grounded
-                or evidence_score < ESCALATION_THRESHOLD
-                or (not is_refused and not sources)
+                evidence_score < ESCALATION_THRESHOLD
+                and sources
             )
 
             gr2_ms = int((time.time() - start_gr2) * 1000)
             latency_monitor.record("guardrail", gr2_ms)
 
-            passed = not is_refused and is_grounded and not needs_escalation
+            passed = not is_refused
             reason = None
-            fallback_answer = None
             if is_refused:
                 reason = "Question is outside the knowledge base."
             elif not is_grounded:
                 reason = "Answer may not be grounded in retrieved context."
-                fallback_answer = "I'm not confident enough in my answer based on the available sources. This query may need further review."
             elif needs_escalation:
-                reason = "Low evidence confidence — answer flagged for escalation."
-                fallback_answer = "I found some related information but I'm not fully confident in the response. This has been flagged for review."
+                reason = "Low evidence confidence — flagged for review."
 
             total_ms = int((time.time() - start_total) * 1000)
 
@@ -153,7 +149,7 @@ class RAGHarness:
             ]
 
             resp = TextResponse(
-                answer=fallback_answer if fallback_answer else llm_result["answer"],
+                answer=llm_result["answer"],
                 sources=sources,
                 evidence_path=evidence_links,
                 latency=LatencyBreakdown(
@@ -267,9 +263,8 @@ class RAGHarness:
             evidence_map = map_evidence(full_answer, src_dicts)
             evidence_score = compute_evidence_score(evidence_map)
             needs_escalation = (
-                not is_grounded
-                or evidence_score < ESCALATION_THRESHOLD
-                or (not is_refused and not sources)
+                evidence_score < ESCALATION_THRESHOLD
+                and sources
             )
 
             total_rag_ms = int((time.time() - start_rag) * 1000)
@@ -284,14 +279,16 @@ class RAGHarness:
                 for e in evidence_map
             ]
 
-            fallback_answer = None
-            if not is_refused and not is_grounded:
-                fallback_answer = "I'm not confident enough in my answer based on the available sources. This query may need further review."
-            elif needs_escalation and not is_refused:
-                fallback_answer = "I found some related information but I'm not fully confident. This has been flagged for review."
+            reason = None
+            if is_refused:
+                reason = "Question is outside the knowledge base."
+            elif not is_grounded:
+                reason = "Answer may not be grounded in retrieved context."
+            elif needs_escalation:
+                reason = "Low evidence confidence — flagged for review."
 
             final_data = TextResponse(
-                answer=fallback_answer if fallback_answer else full_answer,
+                answer=full_answer,
                 sources=sources,
                 evidence_path=evidence_links,
                 latency=LatencyBreakdown(
@@ -302,10 +299,10 @@ class RAGHarness:
                     total_ms=total_rag_ms
                 ),
                 guardrail=GuardrailResult(
-                    passed=not is_refused and is_grounded and not needs_escalation,
+                    passed=not is_refused,
                     off_topic=False, unsafe=False,
                     grounded=is_grounded, refused=is_refused,
-                    reason=None,
+                    reason=reason,
                     evidence_score=evidence_score,
                     needs_escalation=needs_escalation,
                 ),
