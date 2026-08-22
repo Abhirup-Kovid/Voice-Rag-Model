@@ -141,3 +141,28 @@ async def get_stream(stream_id: str, request: Request):
 @app.get("/api/stats")
 async def get_stats():
     return latency_monitor.get_stats()
+
+
+_escalation_log: list = []
+
+
+@app.post("/api/escalate")
+async def escalate_query(request: Request):
+    body = await request.json()
+    entry = {
+        "query_id": body.get("query_id"),
+        "query": body.get("query"),
+        "answer": body.get("answer"),
+        "reason": body.get("reason"),
+        "evidence_score": body.get("evidence_score"),
+        "timestamp": time.time(),
+    }
+    _escalation_log.append(entry)
+    if len(_escalation_log) > 200:
+        _escalation_log.pop(0)
+    return {"status": "logged", "total_pending": len(_escalation_log)}
+
+
+@app.get("/api/escalations")
+async def list_escalations():
+    return {"count": len(_escalation_log), "items": _escalation_log[-20:]}
