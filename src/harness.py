@@ -5,13 +5,18 @@ import asyncio
 import structlog
 from typing import AsyncIterator, Optional
 
-from src.schemas import TextResponse, LatencyBreakdown, GuardrailResult, Source
+from src.schemas import TextResponse, LatencyBreakdown, GuardrailResult, Source, EvidenceLink
 from src.retriever import retrieve, warmup as retriever_warmup
 from src.query_cache import query_cache
-from src.guardrails import check_unsafe, check_off_topic, check_grounding, check_refusal
+from src.guardrails import (
+    check_unsafe, check_off_topic, check_grounding, check_refusal,
+    map_evidence, compute_evidence_score, split_sentences,
+)
 from src.stt_sarvam import transcribe_audio, STTError
 from src.llm_groq import generate_stream, generate_full
 from src.latency import latency_monitor
+
+ESCALATION_THRESHOLD = 0.15
 
 logger = structlog.get_logger(__name__)
 
@@ -104,23 +109,53 @@ class RAGHarness:
             llm_total_ms = int((time.time() - start_llm) * 1000)
             latency_monitor.record("llm", llm_total_ms)
             
-            # 6. Guardrail: Grounding & Refusal
+            # 6. Guardrail: Grounding, Refusal, Evidence Mapping, Escalation
             start_gr2 = time.time()
             is_refused = check_refusal(llm_result["answer"])
             is_grounded, overlap = check_grounding(llm_result["answer"], [s.text for s in sources])
+
+            # Evidence path: map each answer sentence to its best source
+            src_dicts = [{"text": s.text, "doc_id": s.doc_id} for s in sources]
+            evidence_map = map_evidence(llm_result["answer"], src_dicts)
+            evidence_score = compute_evidence_score(evidence_map)
+
+            needs_escalation = (
+                not is_grounded
+                or evidence_score < ESCALATION_THRESHOLD
+                or (not is_refused and not sources)
+            )
+
             gr2_ms = int((time.time() - start_gr2) * 1000)
             latency_monitor.record("guardrail", gr2_ms)
-            
-            passed = not is_refused
+
+            passed = not is_refused and is_grounded and not needs_escalation
             reason = None
-            if is_refused: reason = "Question is outside the knowledge base."
-            elif not is_grounded: reason = "Answer may not be grounded in retrieved context."
-            
+            fallback_answer = None
+            if is_refused:
+                reason = "Question is outside the knowledge base."
+            elif not is_grounded:
+                reason = "Answer may not be grounded in retrieved context."
+                fallback_answer = "I'm not confident enough in my answer based on the available sources. This query may need further review."
+            elif needs_escalation:
+                reason = "Low evidence confidence — answer flagged for escalation."
+                fallback_answer = "I found some related information but I'm not fully confident in the response. This has been flagged for review."
+
             total_ms = int((time.time() - start_total) * 1000)
-            
+
+            evidence_links = [
+                EvidenceLink(
+                    sentence=e["sentence"],
+                    source_idx=e["source_idx"],
+                    source_id=e["source_id"],
+                    confidence=e["confidence"],
+                )
+                for e in evidence_map
+            ]
+
             resp = TextResponse(
-                answer=llm_result["answer"],
+                answer=fallback_answer if fallback_answer else llm_result["answer"],
                 sources=sources,
+                evidence_path=evidence_links,
                 latency=LatencyBreakdown(
                     retrieve_ms=ret_ms,
                     guardrail_ms=gr_ms + gr2_ms,
@@ -134,12 +169,14 @@ class RAGHarness:
                     unsafe=False,
                     grounded=is_grounded,
                     refused=is_refused,
-                    reason=reason
+                    reason=reason,
+                    evidence_score=evidence_score,
+                    needs_escalation=needs_escalation,
                 ),
                 query_id=query_id,
                 cached=False
             )
-            
+
             if passed:
                 query_cache.set(query, resp)
 
@@ -224,12 +261,39 @@ class RAGHarness:
             # Grounding check
             is_grounded, overlap = check_grounding(full_answer, [s.text for s in sources])
             is_refused = check_refusal(full_answer)
-            
+
+            # Evidence mapping
+            src_dicts = [{"text": s.text, "doc_id": s.doc_id} for s in sources]
+            evidence_map = map_evidence(full_answer, src_dicts)
+            evidence_score = compute_evidence_score(evidence_map)
+            needs_escalation = (
+                not is_grounded
+                or evidence_score < ESCALATION_THRESHOLD
+                or (not is_refused and not sources)
+            )
+
             total_rag_ms = int((time.time() - start_rag) * 1000)
-            
+
+            evidence_links = [
+                EvidenceLink(
+                    sentence=e["sentence"],
+                    source_idx=e["source_idx"],
+                    source_id=e["source_id"],
+                    confidence=e["confidence"],
+                )
+                for e in evidence_map
+            ]
+
+            fallback_answer = None
+            if not is_refused and not is_grounded:
+                fallback_answer = "I'm not confident enough in my answer based on the available sources. This query may need further review."
+            elif needs_escalation and not is_refused:
+                fallback_answer = "I found some related information but I'm not fully confident. This has been flagged for review."
+
             final_data = TextResponse(
-                answer=full_answer,
+                answer=fallback_answer if fallback_answer else full_answer,
                 sources=sources,
+                evidence_path=evidence_links,
                 latency=LatencyBreakdown(
                     stt_ms=stt_ms,
                     retrieve_ms=ret_ms,
@@ -238,10 +302,12 @@ class RAGHarness:
                     total_ms=total_rag_ms
                 ),
                 guardrail=GuardrailResult(
-                    passed=not is_refused and is_grounded,
+                    passed=not is_refused and is_grounded and not needs_escalation,
                     off_topic=False, unsafe=False,
                     grounded=is_grounded, refused=is_refused,
-                    reason=None
+                    reason=None,
+                    evidence_score=evidence_score,
+                    needs_escalation=needs_escalation,
                 ),
                 query_id=str(uuid.uuid4()),
                 cached=False
