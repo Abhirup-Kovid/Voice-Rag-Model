@@ -55,8 +55,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 async def get_index():
+    import time as _time
     with open("static/index.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+        content = f.read().replace("app.js?v=2", f"app.js?v={int(_time.time())}")
+        return HTMLResponse(content=content, headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"})
 
 
 @app.get("/api/health")
